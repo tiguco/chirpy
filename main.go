@@ -2,38 +2,67 @@ package main
 
 import (
 	"log"
+	"strconv"
+	"sync/atomic"
 	"net/http"
-	"time"
 )
 
-func main() {
-	// 1. Create a new http.ServeMux to route requests
-	mux := http.NewServeMux()
-
-	// 2. Use http.Dir to convert the current directory (".") to a directory for the FileServer
-	dir := http.Dir(".")
-	
-	// 3. Create a standard http.FileServer using the directory
-	fileServer := http.FileServer(dir)
-	
-	// 4. Use the ServeMux's .Handle() method to add a handler for the root path (/)
-	//    The file server will serve index.html when someone visits the root
-	mux.Handle("/", fileServer)
-
-	// Create the HTTP server with the mux as the handler
-	server := &http.Server{
-		Handler:      mux,
-		Addr:         ":8080",
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
-	}
-
-	log.Println("Server starting on http://localhost:8080")
-	log.Println("Serving files from current directory (.)")
-	log.Println("Try visiting: http://localhost:8080/index.html")
-	
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
-	}
+type apiConfig struct {
+	fileserverHits atomic.Int32
 }
+
+
+func main() {
+	const filepathRoot = "."
+	const port = "8080"
+	apiCfg := &apiConfig{}
+
+	mux := http.NewServeMux()
+	//mux.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
+
+	mux.HandleFunc("/reset", apiCfg.middlewareMetricsReset)
+	mux.HandleFunc("/metrics", apiCfg.middlewareMetricsGet)
+
+
+	mux.HandleFunc("/healthz", handlerReadiness)
+
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: mux,
+	}
+
+	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
+	log.Fatal(srv.ListenAndServe())
+}
+
+func handlerReadiness(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(http.StatusText(http.StatusOK)))
+}
+
+func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg.fileserverHits.Add(1)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (cfg *apiConfig) middlewareMetricsReset(w http.ResponseWriter, r *http.Request) {
+	cfg.fileserverHits.Store(0)
+	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+}
+
+
+func (cfg *apiConfig) middlewareMetricsGet(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	//w.Write([]byte(http.StatusText(cfg.fileserverHits.Load())))
+	w.Write([]byte("Hits: " + strconv.Itoa(int(cfg.fileserverHits.Load()))))
+}
+
+
+
+
