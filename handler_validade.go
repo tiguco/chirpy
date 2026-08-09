@@ -3,14 +3,26 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 )
+
+func unprofanator(msg string) string {
+	re1 := regexp.MustCompile(`(?i)\bkerfuffle\b`)
+	newStr1 := re1.ReplaceAllString(msg, "****")
+	re2 := regexp.MustCompile(`(?i)\bsharbert\b`)
+	newStr2 := re2.ReplaceAllString(newStr1, "****")
+	re3 := regexp.MustCompile(`(?i)\bfornax\b`)
+	newStr3 := re3.ReplaceAllString(newStr2, "****")
+	return newStr3
+}
+
 
 func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
 	}
 	type returnVals struct {
-		Valid bool `json:"valid"`
+		Cleaned_body string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -27,7 +39,9 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cleanedmsg := unprofanator(params.Body)
+
 	respondWithJSON(w, http.StatusOK, returnVals{
-		Valid: true,
+		Cleaned_body: cleanedmsg,
 	})
 }
