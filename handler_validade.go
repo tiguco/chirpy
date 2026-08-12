@@ -3,26 +3,15 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
+	"strings"
 )
-
-func unprofanator(msg string) string {
-	re1 := regexp.MustCompile(`(?i)\bkerfuffle\b`)
-	newStr1 := re1.ReplaceAllString(msg, "****")
-	re2 := regexp.MustCompile(`(?i)\bsharbert\b`)
-	newStr2 := re2.ReplaceAllString(newStr1, "****")
-	re3 := regexp.MustCompile(`(?i)\bfornax\b`)
-	newStr3 := re3.ReplaceAllString(newStr2, "****")
-	return newStr3
-}
-
 
 func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
 	}
 	type returnVals struct {
-		Cleaned_body string `json:"cleaned_body"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -39,9 +28,26 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cleanedmsg := unprofanator(params.Body)
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+	cleaned := getCleanedBody(params.Body, badWords)
 
 	respondWithJSON(w, http.StatusOK, returnVals{
-		Cleaned_body: cleanedmsg,
+		CleanedBody: cleaned,
 	})
+}
+
+func getCleanedBody(body string, badWords map[string]struct{}) string {
+	words := strings.Split(body, " ")
+	for i, word := range words {
+		loweredWord := strings.ToLower(word)
+		if _, ok := badWords[loweredWord]; ok {
+			words[i] = "****"
+		}
+	}
+	cleaned := strings.Join(words, " ")
+	return cleaned
 }
