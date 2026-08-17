@@ -1,1 +1,0 @@
-curl -X POST -H "Content-Type: application/json" -d '{"password:"12345", "email": "didi@trapa.com"}' http://localhost:8080/api/users
