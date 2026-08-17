@@ -15,5 +15,4 @@ ORDER BY created_at ASC;
 
 -- name: GetChirp :one
 SELECT * FROM chirps
-where id = $1;
-
+WHERE id = $1;

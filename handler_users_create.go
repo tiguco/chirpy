@@ -5,52 +5,60 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
+//	"github.com/bootdotdev/learn-http-servers/internal/auth"
+//	"github.com/bootdotdev/learn-http-servers/internal/database"
 	"github.com/tiguco/chirpy/internal/auth"
 	"github.com/tiguco/chirpy/internal/database"
+	"github.com/google/uuid"
 )
 
-type User2 struct {
+type User struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+	Password  string    `json:"-"`
 }
 
 func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request) {
-	type parametersIn struct {
+	type parameters struct {
 		Password string `json:"password"`
-		Email string `json:"email"`
+		Email    string `json:"email"`
 	}
-//	type response struct {
-//		User2
-//	}
+	type response struct {
+		User
+	}
 
 	decoder := json.NewDecoder(r.Body)
-	paramsIn := parametersIn{}
-	err := decoder.Decode(&paramsIn)
+	params := parameters{}
+	err := decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
 	}
-	params := database.CreateUserParams{}
-	params.Email = paramsIn.Email
 
-	hashedPass, err := auth.HashPassword(paramsIn.Password)
-	params.HashedPassword = hashedPass
+	hashedPassword, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password", err)
+		return
+	}
 
-	user, err := cfg.db.CreateUser(r.Context(), params)
+	user, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{
+		Email:          params.Email,
+		HashedPassword: hashedPassword,
+	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create user", err)
 		return
 	}
-	//response := database.CreateUserRow{
-	response := User2{
-			ID:        user[0].ID,
-			CreatedAt: user[0].CreatedAt,
-			UpdatedAt: user[0].UpdatedAt,
-			Email:     user[0].Email}
 
-
-	respondWithJSON(w, http.StatusCreated, response)
+	respondWithJSON(w, http.StatusCreated, response{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		},
+	})
 }
+

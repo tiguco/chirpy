@@ -8,4 +8,4 @@ CREATE TABLE chirps (
 );
 
 -- +goose Down
-DROP TABLE feeds;
+DROP TABLE chirps;

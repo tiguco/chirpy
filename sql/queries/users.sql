@@ -1,4 +1,4 @@
--- name: CreateUser :many
+-- name: CreateUser :one
 INSERT INTO users (id, created_at, updated_at, email, hashed_password)
 VALUES (
     gen_random_uuid(),
@@ -7,14 +7,8 @@ VALUES (
     $1,
     $2
 )
-RETURNING id, created_at, updated_at, email;
+RETURNING *;
 
--- name: DeleteUsers :exec
-DELETE FROM users;
-
--- name: GetHashedPasswordFromEmail :one
-select hashed_password from users where email = $1;
-
--- name: GetUserFromEmail :one
-select id, created_at, updated_at, email from users where email = $1;
-
+-- name: GetUserByEmail :one
+SELECT * FROM users
+WHERE email = $1;

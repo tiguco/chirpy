@@ -2,33 +2,32 @@ package main
 
 import (
 	"net/http"
+
 	"github.com/google/uuid"
-        "time"
 )
 
+func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, r *http.Request) {
+	chirpIDString := r.PathValue("chirpID")
+	chirpID, err := uuid.Parse(chirpIDString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid chirp ID", err)
+		return
+	}
 
-//import (
-//        "encoding/json"
-//        "errors"
-//        "net/http"
-//        "strings"
-//        "time"
-//        //"github.com/bootdotdev/learn-http-servers/internal/database"
-//        "github.com/tiguco/chirpy/internal/database"
-//        "github.com/google/uuid"
-//)
-// 
+	dbChirp, err := cfg.db.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Couldn't get chirp", err)
+		return
+	}
 
-
-
-type Chirp2 struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	UserID    uuid.UUID `json:"user_id"`
-	Body      string    `json:"body"`
+	respondWithJSON(w, http.StatusOK, Chirp{
+		ID:        dbChirp.ID,
+		CreatedAt: dbChirp.CreatedAt,
+		UpdatedAt: dbChirp.UpdatedAt,
+		UserID:    dbChirp.UserID,
+		Body:      dbChirp.Body,
+	})
 }
-
 
 func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Request) {
 	dbChirps, err := cfg.db.GetChirps(r.Context())
@@ -49,40 +48,4 @@ func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Reque
 	}
 
 	respondWithJSON(w, http.StatusOK, chirps)
-}
-
-func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
-        
-    idStr := r.PathValue("chirpID")
-    
-    if idStr == "" {
-        http.Error(w, "Missing resource ID", http.StatusBadRequest)
-        return
-    }
-
-
-    // Parse the UUID
-    id, err := uuid.Parse(idStr)
-    if err != nil {
-	    http.Error(w, "Invalid UUID format", http.StatusBadRequest)
-	    return
-    }
-
-    chirp, err := cfg.db.GetChirp(r.Context(), id)
-
-    myChirp := Chirp2{
-                ID:        chirp.ID,
-                CreatedAt: chirp.CreatedAt,
-                UpdatedAt: chirp.UpdatedAt,
-                Body:      chirp.Body,
-                UserID:    chirp.UserID,
-    }
-
-    if err != nil {
-	    respondWithError(w, http.StatusNotFound, "Chirp not found", err)
-	    return
-    }
-
-    respondWithJSON(w, http.StatusOK, myChirp)
-
 }

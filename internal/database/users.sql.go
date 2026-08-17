@@ -7,12 +7,9 @@ package database
 
 import (
 	"context"
-	"time"
-
-	"github.com/google/uuid"
 )
 
-const createUser = `-- name: CreateUser :many
+const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, created_at, updated_at, email, hashed_password)
 VALUES (
     gen_random_uuid(),
@@ -21,7 +18,7 @@ VALUES (
     $1,
     $2
 )
-RETURNING id, created_at, updated_at, email
+RETURNING id, created_at, updated_at, email, hashed_password
 `
 
 type CreateUserParams struct {
@@ -29,80 +26,33 @@ type CreateUserParams struct {
 	HashedPassword string
 }
 
-type CreateUserRow struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Email     string
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) ([]CreateUserRow, error) {
-	rows, err := q.db.QueryContext(ctx, createUser, arg.Email, arg.HashedPassword)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []CreateUserRow
-	for rows.Next() {
-		var i CreateUserRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Email,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const deleteUsers = `-- name: DeleteUsers :exec
-DELETE FROM users
-`
-
-func (q *Queries) DeleteUsers(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, deleteUsers)
-	return err
-}
-
-const getHashedPasswordFromEmail = `-- name: GetHashedPasswordFromEmail :one
-select hashed_password from users where email = $1
-`
-
-func (q *Queries) GetHashedPasswordFromEmail(ctx context.Context, email string) (string, error) {
-	row := q.db.QueryRowContext(ctx, getHashedPasswordFromEmail, email)
-	var hashed_password string
-	err := row.Scan(&hashed_password)
-	return hashed_password, err
-}
-
-const getUserFromEmail = `-- name: GetUserFromEmail :one
-select id, created_at, updated_at, email from users where email = $1
-`
-
-type GetUserFromEmailRow struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Email     string
-}
-
-func (q *Queries) GetUserFromEmail(ctx context.Context, email string) (GetUserFromEmailRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserFromEmail, email)
-	var i GetUserFromEmailRow
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createUser, arg.Email, arg.HashedPassword)
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
+		&i.HashedPassword,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, created_at, updated_at, email, hashed_password FROM users
+WHERE email = $1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.HashedPassword,
 	)
 	return i, err
 }
